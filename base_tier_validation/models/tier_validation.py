@@ -193,15 +193,6 @@ class TierValidation(models.AbstractModel):
                 return False
         return True
 
-    def _check_tier_state_transition(self, vals):
-        """
-        Check we are in origin state and not destination state
-        """
-        self.ensure_one()
-        return getattr(self, self._state_field) in self._state_from and not vals.get(
-            self._state_field
-        ) in (self._state_to + [self._cancel_state])
-
     def write(self, vals):
         for rec in self:
             if rec._check_state_conditions(vals):
@@ -233,12 +224,20 @@ class TierValidation(models.AbstractModel):
             self.mapped("review_ids").unlink()
         return super(TierValidation, self).write(vals)
 
-    def _check_state_conditions(self, vals):
+    def _check_state_conditions(self, vals, extra_to=None):
         self.ensure_one()
-        return (
-            getattr(self, self._state_field) in self._state_from
-            and vals.get(self._state_field) in self._state_to
-        )
+        _state_to = self._state_to + extra_to if extra_to else []
+        is_from_state = getattr(self, self._state_field) in self._state_from
+        return is_from_state and self._get_state_from(vals) in _state_to
+
+    def _get_state_from(self, vals):
+        return vals.get(self._state_field)
+
+    def _check_tier_state_transition(self, vals):
+        """
+        Check we are in origin state and not destination state
+        """
+        return self._check_state_conditions(vales, extra_to=[self._cancel_state])
 
     def _validate_tier(self, tiers=False):
         self.ensure_one()
